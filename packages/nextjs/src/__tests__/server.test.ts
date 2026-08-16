@@ -202,8 +202,20 @@ describe("standalone getSession, getUser, and requireAuth exports", () => {
     expect(session).toBeNull();
   });
 
-  it("standalone getSession returns session when cookie exists", async () => {
-    const secret = process.env.BOLKAUTH_SECRET || "default-dev-secret-change-in-production-min-32-chars";
+  it("standalone getSession throws error when BOLKAUTH_SECRET is not set", async () => {
+    mockCookiesStore.get.mockReturnValue({ value: "some-jwt-token" });
+    const originalSecret = process.env.BOLKAUTH_SECRET;
+    delete process.env.BOLKAUTH_SECRET;
+
+    await expect(getSession()).rejects.toThrow("BOLKAUTH_SECRET is not set. A secret is required to verify session tokens.");
+
+    process.env.BOLKAUTH_SECRET = originalSecret;
+  });
+
+  it("standalone getSession returns session when cookie exists and secret is set", async () => {
+    const secret = "test-secret-key-12345";
+    const originalSecret = process.env.BOLKAUTH_SECRET;
+    process.env.BOLKAUTH_SECRET = secret;
     const token = await signJwt({ sessionId: "session", userId: "user" }, secret);
 
     mockCookiesStore.get.mockImplementation((name: string) => {
@@ -217,10 +229,14 @@ describe("standalone getSession, getUser, and requireAuth exports", () => {
       userId: "user",
       token,
     });
+
+    process.env.BOLKAUTH_SECRET = originalSecret;
   });
 
-  it("standalone getUser returns user object when session exists", async () => {
-    const secret = process.env.BOLKAUTH_SECRET || "default-dev-secret-change-in-production-min-32-chars";
+  it("standalone getUser returns null when session exists but no adapter attached", async () => {
+    const secret = "test-secret-key-12345";
+    const originalSecret = process.env.BOLKAUTH_SECRET;
+    process.env.BOLKAUTH_SECRET = secret;
     const token = await signJwt({ sessionId: "session", userId: "user" }, secret);
 
     mockCookiesStore.get.mockImplementation((name: string) => {
@@ -230,6 +246,8 @@ describe("standalone getSession, getUser, and requireAuth exports", () => {
 
     const user = await getUser();
     expect(user).toBeNull(); // Default standalone has no adapter attached
+
+    process.env.BOLKAUTH_SECRET = originalSecret;
   });
 
   it("standalone requireAuth redirects when user is null", async () => {
