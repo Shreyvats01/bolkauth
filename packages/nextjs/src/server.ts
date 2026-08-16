@@ -50,14 +50,17 @@ export function createServerHelpers(authInstance: { config: { secret: string; se
   };
 }
 
-const defaultSecret = process.env.BOLKAUTH_SECRET || "default-dev-secret-change-in-production-min-32-chars";
-
 export const getSession = safeCache(async () => {
   const cookieStore = await cookies();
   const jwt = cookieStore.get("bolkauth.session")?.value || cookieStore.get("authflow.session")?.value;
   if (!jwt) return null;
+
+  const secret = process.env.BOLKAUTH_SECRET;
+  if (!secret) {
+    throw new Error("BOLKAUTH_SECRET is not set. A secret is required to verify session tokens.");
+  }
+
   try {
-    const secret = process.env.BOLKAUTH_SECRET || defaultSecret;
     const payload = (await verifyJwt(jwt, secret)) as { sessionId: string; userId: string };
     if (!payload || !payload.sessionId || !payload.userId) return null;
     return { id: payload.sessionId, userId: payload.userId, token: jwt };
